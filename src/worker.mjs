@@ -61,7 +61,7 @@ export default {
   },
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
-    if (path === '/health' && request.method === 'GET') return json({service:'telegram-order-manager', running:true});
+    if (path === '/health' && request.method === 'GET') return json({service:'telegram-order-manager',version:'0.1.6',running:true});
     if (path === '/ops/webhook' && ['GET','POST'].includes(request.method)) {
       if (!env.WEBHOOK_SECRET || !await validSecret(request.headers.get('X-Setup-Secret'),env.WEBHOOK_SECRET)) return new Response('Forbidden',{status:403});
       if (!env.BOT_TOKEN) return json({ok:false,error:'Bot token is not configured'},503);
