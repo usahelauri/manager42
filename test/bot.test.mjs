@@ -145,6 +145,22 @@ test('same order from two customers stays linked to the correct customer on mana
   assert.ok(!f.calls[1].body.text.includes('client'));
 });
 
+test('admin-only group capability test attempts business send without enabling order routing',async(t)=>{
+  const f=fixture(t,{MANAGERS_CHAT_ID:undefined,ADMIN_IDS:'100'});
+  await f.storage.put('activeConnection',{id:'business-1',ts:Date.now()});
+  f.setResponseHook((method,body)=>body.chat_id===-100500
+    ? Response.json({ok:false,error_code:400,description:'Business connection cannot send to this chat'}) : null);
+  const command=(id,uid)=>({message_id:id,chat:{id:uid,type:'private'},from:{id:uid},text:'/test_group -100500'});
+  await f.enqueue({update_id:1,message:command(1,999)});
+  assert.equal(f.calls.length,0);
+  await f.enqueue({update_id:2,message:command(2,100)});
+  assert.equal(f.calls[0].body.chat_id,-100500);
+  assert.equal(f.calls[0].body.business_connection_id,'business-1');
+  assert.equal(f.calls[1].body.chat_id,100);
+  assert.match(f.calls[1].body.text,/Тест не отправлен/);
+  assert.equal((await f.storage.list({prefix:'batch:'})).size,0);
+});
+
 test('question sends waiting message and owner alert, pauses the session, and never copies to managers',async(t)=>{
   const f=fixture(t);
   await f.enqueue({update_id:1,business_message:f.incoming(10,'Когда доставка?')}); await f.flush();

@@ -2,7 +2,7 @@ import { classify, benignManagerReply, plainPreview } from './rules.mjs';
 import { contentRequest } from './media.mjs';
 
 const DAY = 86400000;
-const HELP = 'Копирую заказы в рабочую группу. /id — ID пользователя и чата. Администраторам в личном чате: /status, /pause ID_КЛИЕНТА, /resume ID_КЛИЕНТА. Менеджерам: отвечайте реплаем на скопированный заказ. Нестандартные сообщения передаются администраторам.';
+const HELP = 'Копирую заказы в рабочую группу. /id — ID пользователя и чата. Администраторам в личном чате: /status, /pause ID_КЛИЕНТА, /resume ID_КЛИЕНТА, /test_group ID_ГРУППЫ. Менеджерам: отвечайте реплаем на скопированный заказ. Нестандартные сообщения передаются администраторам.';
 const json = (value, status = 200) => Response.json(value, { status });
 const keyOf = (prefix, id) => `${prefix}:${id}`;
 class Retry extends Error { constructor(seconds = 10) { super('retry'); this.seconds = seconds; } }
@@ -354,6 +354,24 @@ export class OrderManager {
         const paused=[...sessions.values()].filter(s=>s.paused).map(s=>`${s.id}: ${s.reason}`).slice(0,30);
         const c=await this.db.get('activeConnection');
         await this.send(`status:${uid}`,'sendMessage',{chat_id:m.chat.id,text:`Аккаунт для клиентских переписок: ${this.owner() || 'не настроен'}\nАдминистраторы: ${this.admins().join(', ') || 'не настроены'}\nГруппа: ${this.managers() || 'не настроена'}\nПодключение: ${c ? 'получено' : 'не получено'}\nСбоев за период хранения: ${failed.size}\nПаузы:\n${paused.join('\n') || 'нет'}`});
+      } else if (command==='/test_group') {
+        const groupId=text.split(/\s+/)[1],active=await this.db.get('activeConnection');
+        let result;
+        if (!/^-[1-9]\d*$/.test(groupId || '') || !Number.isSafeInteger(Number(groupId))) result='Укажи точный ID группы: /test_group -123456789';
+        else if (!active) result='Нет подключения режима секретаря.';
+        else {
+          try {
+            const c=await this.connection(active.id);
+            if (!c.is_enabled || !c.rights?.can_reply) throw new Review('Нет права отвечать от имени аккаунта.');
+            const sent=await this.send(`business-group-test:${uid}`,'sendMessage',{
+              chat_id:Number(groupId),business_connection_id:c.id,text:'Проверка: сообщение от имени Артёма.'
+            });
+            result=`Тест отправлен в группу. Telegram указал отправителя ID ${sent.from?.id || 'неизвестен'}. Проверь отображение сообщения в группе.`;
+          } catch(error) {
+            result=`Тест не отправлен: ${error instanceof Review ? error.message : 'ошибка Telegram'}.`;
+          }
+        }
+        await this.send(`test-result:${uid}`,'sendMessage',{chat_id:m.chat.id,text:result});
       } else if (['/pause','/resume'].includes(command)) {
         const id=text.split(/\s+/)[1];
         const s=/^\d+$/.test(id || '') ? await this.db.get(`session:${id}`) : null;
