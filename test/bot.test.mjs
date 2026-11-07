@@ -85,6 +85,27 @@ test('scheduled setup registers the private webhook once when secrets and URL ar
   await assert.rejects(ensureWebhook({...env,WEBHOOK_URL:'https://example.workers.dev/telegram?token=bad'}),/Invalid webhook URL/);
 });
 
+test('operator webhook check requires the secret and reports setup without exposing credentials',async(t)=>{
+  const env={BOT_TOKEN:'TEST_TOKEN',WEBHOOK_SECRET:'z'.repeat(64),WEBHOOK_URL:'https://example.workers.dev/telegram'};
+  const calls=[];
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    const method=String(url).split('/').at(-1);
+    calls.push(method);
+    return Response.json({ok:true,result:method==='getMe' ? {username:'order_bot',can_connect_to_business:true}
+      : method==='getWebhookInfo' ? {url:env.WEBHOOK_URL,allowed_updates:['message','business_connection','business_message','edited_business_message','deleted_business_messages'],pending_update_count:0}
+      : true});
+  });
+  const request=(secret)=>new Request('https://example.workers.dev/ops/webhook',{method:'POST',headers:{'X-Setup-Secret':secret}});
+  assert.equal((await worker.fetch(request('wrong'),env)).status,403);
+  assert.deepEqual(calls,[]);
+  const result=await worker.fetch(request(env.WEBHOOK_SECRET),env);
+  assert.equal(result.status,200);
+  const status=await result.json();
+  assert.deepEqual(status,{ok:true,username:'order_bot',business_mode:true,webhook_url:env.WEBHOOK_URL,pending_updates:0,last_error:null});
+  assert.ok(!JSON.stringify(status).includes(env.BOT_TOKEN));
+  assert.ok(!JSON.stringify(status).includes(env.WEBHOOK_SECRET));
+});
+
 test('multi-message order is debounced, copied without metadata, then acknowledged once',async(t)=>{
   const f=fixture(t);
   await f.enqueue({update_id:1,business_message:f.incoming(10)});
