@@ -1,0 +1,15 @@
+{
+  "name": "telegram-order-manager",
+  "version": "0.1.2",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "telegram:check": "node scripts/telegram.mjs check",
+    "telegram:webhook": "node scripts/telegram.mjs webhook"
+  },
+  "devDependencies": { "wrangler": "^4.0.0" }
+}

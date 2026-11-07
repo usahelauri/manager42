@@ -1,0 +1,4 @@
+# Copy to .dev.vars locally. Never commit the filled file.
+BOT_TOKEN=REPLACE_WITH_BOTFATHER_TOKEN
+WEBHOOK_SECRET=REPLACE_WITH_RANDOM_HEX_SECRET
+WEBHOOK_URL=https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev/telegram

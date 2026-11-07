@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "telegram-order-manager",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-11-07",
+  "workers_dev": true,
+  "vars": {
+    "DEBOUNCE_SECONDS": "30",
+    "MAX_BATCH_SECONDS": "120",
+    "ACCEPT_TEXT": "Здравствуйте, принял.",
+    "WAIT_TEXT": "Пожалуйста, дайте немного времени на уточнение. Скоро вернусь с ответом.",
+    "MANAGER_WAIT_TEXT": "Принял, уточню и вернусь с ответом.",
+    "PRODUCT_WORDS": "пюре,сироп,манго,маракуйя,маракуйи,малина,клубника,персик,вишня,личи,гуава,ананас,облепиха,смородина",
+    "RETENTION_DAYS": "30"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MANAGER",
+        "class_name": "OrderManager"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "OrderManager"
+      ]
+    }
+  ],
+  "observability": {
+    "enabled": false
+  }
+}
