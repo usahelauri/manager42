@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker, {OrderManager} from '../src/worker.mjs';
+import worker, {OrderManager,ensureWebhook} from '../src/worker.mjs';
 import {classify} from '../src/rules.mjs';
 import {contentRequest} from '../src/media.mjs';
 
@@ -61,6 +61,28 @@ test('webhook rejects forged requests and accepts a valid secret only after dura
   assert.equal((await worker.fetch(request(f.env.WEBHOOK_SECRET,'{}'),f.env)).status,400);
   assert.equal((await worker.fetch(request(f.env.WEBHOOK_SECRET),f.env)).status,200);
   assert.equal(queued,1);
+});
+
+test('scheduled setup registers the private webhook once when secrets and URL are ready',async(t)=>{
+  const env={BOT_TOKEN:'TEST_TOKEN',WEBHOOK_SECRET:'z'.repeat(64),WEBHOOK_URL:'https://example.workers.dev/telegram'};
+  let current={url:'',allowed_updates:[]};
+  const requests=[];
+  t.mock.method(globalThis,'fetch',async(url,options)=>{
+    const method=String(url).split('/').at(-1), body=JSON.parse(options.body);
+    requests.push({method,body});
+    if (method==='setWebhook') current={url:body.url,allowed_updates:body.allowed_updates};
+    return Response.json({ok:true,result:method==='getWebhookInfo' ? current : true});
+  });
+  assert.equal(await ensureWebhook({...env,WEBHOOK_SECRET:undefined}),false);
+  assert.equal(requests.length,0);
+  assert.equal(await ensureWebhook(env),true);
+  assert.deepEqual(requests.map(r=>r.method),['getWebhookInfo','setWebhook']);
+  assert.equal(requests[1].body.url,env.WEBHOOK_URL);
+  assert.equal(requests[1].body.secret_token,env.WEBHOOK_SECRET);
+  assert.equal(requests[1].body.drop_pending_updates,false);
+  await ensureWebhook(env);
+  assert.deepEqual(requests.map(r=>r.method),['getWebhookInfo','setWebhook','getWebhookInfo']);
+  await assert.rejects(ensureWebhook({...env,WEBHOOK_URL:'https://example.workers.dev/telegram?token=bad'}),/Invalid webhook URL/);
 });
 
 test('multi-message order is debounced, copied without metadata, then acknowledged once',async(t)=>{

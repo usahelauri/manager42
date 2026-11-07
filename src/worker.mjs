@@ -18,7 +18,34 @@ export async function validSecret(actual, expected) {
   return difference === 0;
 }
 
+const WEBHOOK_UPDATES = ['message','business_connection','business_message','edited_business_message','deleted_business_messages'];
+
+// Cloudflare's cron registers the bot after runtime secrets are configured.
+// The Telegram token never has to be copied into a build variable or a URL.
+export async function ensureWebhook(env) {
+  if (!env.BOT_TOKEN || !env.WEBHOOK_SECRET || !env.WEBHOOK_URL) return false;
+  if (!/^[A-Za-z0-9_-]{32,256}$/.test(env.WEBHOOK_SECRET)) throw new Error('Invalid webhook secret');
+  let target;
+  try { target = new URL(env.WEBHOOK_URL); } catch { throw new Error('Invalid webhook URL'); }
+  if (target.protocol !== 'https:' || target.pathname !== '/telegram' || target.search || target.hash || target.username || target.password) throw new Error('Invalid webhook URL');
+  const api = async (method, body = {}) => {
+    const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:AbortSignal.timeout(15000)
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(`Telegram ${method} failed`);
+    return result.result;
+  };
+  const current = await api('getWebhookInfo');
+  if (current.url === target.href && WEBHOOK_UPDATES.every(update => current.allowed_updates?.includes(update))) return true;
+  await api('setWebhook', {url:target.href, secret_token:env.WEBHOOK_SECRET, max_connections:1, drop_pending_updates:false, allowed_updates:WEBHOOK_UPDATES});
+  return true;
+}
+
 export default {
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(ensureWebhook(env));
+  },
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
     if (path === '/health' && request.method === 'GET') return json({service:'telegram-order-manager', running:true});

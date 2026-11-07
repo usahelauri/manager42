@@ -1,6 +1,6 @@
 # Бот для заказов: пюре и сиропы
 
-Версия 0.1.2, подготовлена 7 ноября 2026 года. Код и локальные проверки готовы. К реальному Telegram и Cloudflare проект пока не подключён: для запуска нужны настройки клиентского аккаунта, рабочей группы и секреты.
+Версия 0.1.3, подготовлена 7 ноября 2026 года. Для приёма заказов после публикации нужны runtime secrets, подключение бота в Telegram и рабочая группа.
 
 Личные ID и токены задаются только в runtime secrets Cloudflare. `ADMIN_IDS` содержит ID административных аккаунтов через запятую: все они получают уведомления и могут управлять паузой диалогов. `OWNER_ID` — ID одного аккаунта, в который приходят заказы и к которому подключается бот. Это отдельная настройка; первый административный ID не выбирается автоматически. `MANAGERS_CHAT_ID` — ID рабочей группы. В открытом коде этих значений нет.
 
@@ -9,9 +9,9 @@
 Код находится в [usahelauri/manager42](https://github.com/usahelauri/manager42).
 
 1. В Cloudflare открыть **Workers & Pages → Create application → Import a repository** и выбрать этот репозиторий. Создавать **Worker**, не Pages.
-2. Указать имя Worker **telegram-order-manager** — оно должно совпадать с `name` в `wrangler.jsonc`. Production branch: `main`; root directory: `/`; build command: `npm test`; deploy command: `npx wrangler deploy`. Зависимости устанавливает система сборки.
-3. После первого размещения открыть Worker → **Settings → Variables and Secrets** и добавить именно runtime secrets `BOT_TOKEN`, `WEBHOOK_SECRET` и `ADMIN_IDS`. Не сохранять токен Telegram в исходниках и не путать runtime secrets с переменными сборки.
-4. Зарегистрировать Telegram webhook по шагу 2 ниже. Адрес — опубликованный HTTPS URL Worker с окончанием `/telegram`. Секрет в регистрации должен совпадать с runtime `WEBHOOK_SECRET`.
+2. Указать имя Worker **telegram-order-manager** — оно должно совпадать с `name` в `wrangler.jsonc`. Production branch: `main`; root directory: `/`; build command можно оставить пустым; deploy command: `npx wrangler deploy`. Зависимости устанавливает система сборки.
+3. После первого размещения открыть Worker → **Settings → Variables and Secrets** и добавить runtime secrets `BOT_TOKEN`, `WEBHOOK_SECRET`, `ADMIN_IDS`, `OWNER_ID`, а также переменную `WEBHOOK_URL` с полным HTTPS-адресом Worker и окончанием `/telegram`. Не сохранять токен Telegram в исходниках и не путать runtime secrets с переменными сборки.
+4. После публикации этой версии Cloudflare автоматически зарегистрирует Telegram webhook по расписанию каждые пять минут, когда токен, секрет и адрес настроены. Подключение Cron Trigger к сети Cloudflare может занять ещё несколько минут. Ручной запуск команды и передача токена в браузер не нужны. Проверка — отправить `/id` боту; если ответа пока нет, подождать и повторить.
 5. Нажать «Старт» в боте с обоих административных аккаунтов. Получить `/id` в группе менеджеров. Добавить `OWNER_ID`, `MANAGERS_CHAT_ID` и при необходимости `MANAGERS_THREAD_ID` в runtime secrets Worker. Эти ID не записываются в GitHub.
 6. Подключить бота в настройках Telegram аккаунта, принимающего заказы, разрешив ответы и доступ сначала к одному тестовому диалогу. Выполнить проверку из раздела «Проверка перед клиентами».
 
@@ -75,9 +75,9 @@ npx wrangler secret put ADMIN_IDS
 node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-Сохранить одно и то же значение в секрете Worker и локальном `.dev.vars`, чтобы оно совпало при регистрации webhook.
+При автоматической регистрации достаточно сохранить значение в секрете Worker `WEBHOOK_SECRET` и добавить `WEBHOOK_URL` (полный адрес Worker с `/telegram`). После первого запуска Cron Trigger Worker сам вызовет `setWebhook` через Telegram API. Повторные проверки не сбрасывают накопившиеся обновления.
 
-Скопировать `.dev.vars.example` в `.dev.vars`, заполнить `BOT_TOKEN`, `WEBHOOK_SECRET` и `WEBHOOK_URL`. Последний — адрес развёрнутого Worker с окончанием `/telegram`. Файл `.dev.vars` исключён из Git. Затем:
+Для ручной проверки или немедленной регистрации можно скопировать `.dev.vars.example` в `.dev.vars`, заполнить `BOT_TOKEN`, `WEBHOOK_SECRET` и `WEBHOOK_URL`. Последний — адрес развёрнутого Worker с окончанием `/telegram`. Файл `.dev.vars` исключён из Git. Затем:
 
 ```bash
 npm run telegram:webhook

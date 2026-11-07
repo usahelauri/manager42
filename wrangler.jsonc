@@ -4,6 +4,7 @@
   "main": "src/worker.mjs",
   "compatibility_date": "2026-11-07",
   "workers_dev": true,
+  "triggers": { "crons": ["*/5 * * * *"] },
   "vars": {
     "DEBOUNCE_SECONDS": "30",
     "MAX_BATCH_SECONDS": "120",
