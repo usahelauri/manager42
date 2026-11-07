@@ -66,7 +66,7 @@ export default {
       if (!env.WEBHOOK_SECRET || !await validSecret(request.headers.get('X-Setup-Secret'),env.WEBHOOK_SECRET)) return new Response('Forbidden',{status:403});
       if (!env.BOT_TOKEN) return json({ok:false,error:'Bot token is not configured'},503);
       try {
-        if (request.method === 'POST') await ensureWebhook(env);
+        if (request.method === 'POST' && !await ensureWebhook(env)) return json({ok:false,error:'Webhook URL is not configured'},503);
         return json(await webhookStatus(env));
       } catch (error) { return json({ok:false,error:error.message},502); }
     }

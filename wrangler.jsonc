@@ -6,6 +6,7 @@
   "workers_dev": true,
   "triggers": { "crons": ["*/5 * * * *"] },
   "vars": {
+    "WEBHOOK_URL": "https://telegram-order-manager.kvitoshka2014.workers.dev/telegram",
     "DEBOUNCE_SECONDS": "30",
     "MAX_BATCH_SECONDS": "120",
     "ACCEPT_TEXT": "Здравствуйте, принял.",
